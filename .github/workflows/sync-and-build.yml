@@ -98,7 +98,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest-build
-          name: Latest build (${{ steps.detect.outputs.upstream }})
+          name: ${{ steps.jar.outputs.name }}
           target_commitish: ${{ github.sha }}
           make_latest: 'true'
           prerelease: false
