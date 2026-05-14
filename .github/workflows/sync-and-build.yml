@@ -71,6 +71,18 @@ jobs:
             echo "No upstream changes & not a manual dispatch — skipping build."
           fi
 
+      - name: Patch Community Edition Minecraft version cap
+        if: steps.gate.outputs.build == 'true'
+        run: |
+          FILE=src/main/java/net/coreprotect/config/ConfigHandler.java
+          sed -i 's|public static final String LATEST_VERSION = "[^"]*";|public static final String LATEST_VERSION = "99.99";|' "$FILE"
+          if ! grep -q 'LATEST_VERSION = "99.99"' "$FILE"; then
+            echo "Patch failed — LATEST_VERSION line shape may have changed upstream."
+            grep LATEST_VERSION "$FILE"
+            exit 1
+          fi
+          echo "Patched LATEST_VERSION cap to 99.99."
+
       - name: Set up JDK 25 Temurin
         if: steps.gate.outputs.build == 'true'
         uses: actions/setup-java@v4
