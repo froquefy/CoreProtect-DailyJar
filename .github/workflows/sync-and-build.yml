@@ -93,7 +93,7 @@ jobs:
 
       - name: Build with Maven
         if: steps.gate.outputs.build == 'true'
-        run: mvn -B -ntp clean package
+        run: mvn -B -ntp -Dproject.branch=development clean package
 
       - name: Resolve built JAR & make version-independent copy
         if: steps.gate.outputs.build == 'true'
