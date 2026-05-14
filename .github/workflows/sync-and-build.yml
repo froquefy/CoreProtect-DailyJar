@@ -71,12 +71,12 @@ jobs:
             echo "No upstream changes & not a manual dispatch — skipping build."
           fi
 
-      - name: Set up JDK 21 Temurin
+      - name: Set up JDK 25 Temurin
         if: steps.gate.outputs.build == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '25'
           cache: maven
 
       - name: Build with Maven
@@ -108,7 +108,7 @@ jobs:
 
             Upstream commit: `${{ steps.detect.outputs.upstream }}`
             Built: run ${{ github.run_id }} on ${{ github.run_started_at }}
-            JDK: Temurin 21
+            JDK: Temurin 25
 
             **Stable download URLs:**
             - Version-independent: https://github.com/${{ github.repository }}/releases/latest/download/CoreProtect-latest.jar
