@@ -1,0 +1,118 @@
+name: Sync upstream & publish rolling build
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Build & publish even if no new upstream commits'
+        type: boolean
+        default: true
+
+concurrency:
+  group: sync-and-build
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  sync-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout fork (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Configure git identity
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream & fetch
+        run: |
+          git remote add upstream https://github.com/PlayPro/CoreProtect.git
+          git fetch upstream master --tags --prune
+
+      - name: Detect upstream changes
+        id: detect
+        run: |
+          BEFORE="$(git rev-parse HEAD)"
+          UPSTREAM="$(git rev-parse upstream/master)"
+          echo "before=$BEFORE"     >> "$GITHUB_OUTPUT"
+          echo "upstream=$UPSTREAM" >> "$GITHUB_OUTPUT"
+          if [ "$BEFORE" = "$UPSTREAM" ]; then
+            echo "new_commits=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "new_commits=true"  >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fast-forward master to upstream
+        if: steps.detect.outputs.new_commits == 'true'
+        run: |
+          git merge --ff-only upstream/master
+          git push origin master
+          # To also mirror upstream tags to the fork, uncomment:
+          # git push origin --tags
+
+      - name: Decide whether to build
+        id: gate
+        run: |
+          if [ "${{ steps.detect.outputs.new_commits }}" = "true" ] \
+             || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "No upstream changes & not a manual dispatch — skipping build."
+          fi
+
+      - name: Set up JDK 21 Temurin
+        if: steps.gate.outputs.build == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build with Maven
+        if: steps.gate.outputs.build == 'true'
+        run: mvn -B -ntp clean package
+
+      - name: Resolve built JAR & make version-independent copy
+        if: steps.gate.outputs.build == 'true'
+        id: jar
+        run: |
+          JAR="$(ls target/CoreProtect-*.jar | grep -v -E 'original-|sources|javadoc' | head -n1)"
+          test -f "$JAR" || { echo "No JAR found"; exit 1; }
+          cp "$JAR" target/CoreProtect-latest.jar
+          echo "versioned=$JAR" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "$JAR")" >> "$GITHUB_OUTPUT"
+
+      - name: Publish rolling release
+        if: steps.gate.outputs.build == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-build
+          name: Latest build (${{ steps.detect.outputs.upstream }})
+          target_commitish: ${{ github.sha }}
+          make_latest: 'true'
+          prerelease: false
+          generate_release_notes: false
+          body: |
+            Automated rolling build from upstream master.
+
+            Upstream commit: `${{ steps.detect.outputs.upstream }}`
+            Built: run ${{ github.run_id }} on ${{ github.run_started_at }}
+            JDK: Temurin 21
+
+            **Stable download URLs:**
+            - Version-independent: https://github.com/${{ github.repository }}/releases/latest/download/CoreProtect-latest.jar
+            - Versioned: https://github.com/${{ github.repository }}/releases/latest/download/${{ steps.jar.outputs.name }}
+          files: |
+            target/CoreProtect-latest.jar
+            ${{ steps.jar.outputs.versioned }}
