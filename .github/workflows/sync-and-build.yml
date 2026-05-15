@@ -1,78 +1,35 @@
-name: Sync upstream & publish rolling build
+name: Build latest CoreProtect
 
 on:
   schedule:
     - cron: '0 0 * * *'
   workflow_dispatch:
-    inputs:
-      force_build:
-        description: 'Build & publish even if no new upstream commits'
-        type: boolean
-        default: true
 
 concurrency:
-  group: sync-and-build
+  group: build
   cancel-in-progress: false
 
 permissions:
   contents: write
 
 jobs:
-  sync-and-build:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
-      - name: Checkout fork (full history)
+      - name: Checkout upstream CoreProtect master
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          persist-credentials: true
+          repository: PlayPro/CoreProtect
+          ref: master
+          fetch-depth: 1
 
-      - name: Configure git identity
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      - name: Add upstream & fetch
-        run: |
-          git remote add upstream https://github.com/PlayPro/CoreProtect.git
-          git fetch upstream master --tags --prune
-
-      - name: Detect upstream changes
-        id: detect
-        run: |
-          BEFORE="$(git rev-parse HEAD)"
-          UPSTREAM="$(git rev-parse upstream/master)"
-          echo "before=$BEFORE"     >> "$GITHUB_OUTPUT"
-          echo "upstream=$UPSTREAM" >> "$GITHUB_OUTPUT"
-          if [ "$BEFORE" = "$UPSTREAM" ]; then
-            echo "new_commits=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "new_commits=true"  >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Fast-forward master to upstream
-        if: steps.detect.outputs.new_commits == 'true'
-        run: |
-          git merge --ff-only upstream/master
-          git push origin master
-          # To also mirror upstream tags to the fork, uncomment:
-          # git push origin --tags
-
-      - name: Decide whether to build
-        id: gate
-        run: |
-          if [ "${{ steps.detect.outputs.new_commits }}" = "true" ] \
-             || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "build=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "build=false" >> "$GITHUB_OUTPUT"
-            echo "No upstream changes & not a manual dispatch — skipping build."
-          fi
+      - name: Capture upstream commit SHA
+        id: upstream
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Patch Community Edition Minecraft version cap
-        if: steps.gate.outputs.build == 'true'
         run: |
           FILE=src/main/java/net/coreprotect/config/ConfigHandler.java
           sed -i 's|public static final String LATEST_VERSION = "[^"]*";|public static final String LATEST_VERSION = "99.99";|' "$FILE"
@@ -84,7 +41,6 @@ jobs:
           echo "Patched LATEST_VERSION cap to 99.99."
 
       - name: Set up JDK 25 Temurin
-        if: steps.gate.outputs.build == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -92,11 +48,9 @@ jobs:
           cache: maven
 
       - name: Build with Maven
-        if: steps.gate.outputs.build == 'true'
         run: mvn -B -ntp -Dproject.branch=development clean package
 
       - name: Resolve built JAR & make version-independent copy
-        if: steps.gate.outputs.build == 'true'
         id: jar
         run: |
           JAR="$(ls target/CoreProtect-*.jar | grep -v -E 'original-|sources|javadoc' | head -n1)"
@@ -106,19 +60,17 @@ jobs:
           echo "name=$(basename "$JAR")" >> "$GITHUB_OUTPUT"
 
       - name: Publish rolling release
-        if: steps.gate.outputs.build == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest-build
           name: ${{ steps.jar.outputs.name }}
-          target_commitish: ${{ github.sha }}
           make_latest: 'true'
           prerelease: false
           generate_release_notes: false
           body: |
             Automated rolling build from upstream master.
 
-            Upstream commit: `${{ steps.detect.outputs.upstream }}`
+            Upstream commit: `${{ steps.upstream.outputs.sha }}`
             Built: run ${{ github.run_id }} on ${{ github.run_started_at }}
             JDK: Temurin 25
 
