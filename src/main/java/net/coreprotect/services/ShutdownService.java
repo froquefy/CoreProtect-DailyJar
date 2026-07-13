@@ -13,10 +13,13 @@ import net.coreprotect.consumer.Consumer;
 import net.coreprotect.consumer.process.Process;
 import net.coreprotect.language.Phrase;
 import net.coreprotect.listener.player.PlayerQuitListener;
+import net.coreprotect.listener.player.InventoryChangeListener;
 import net.coreprotect.paper.PaperAdapter;
 import net.coreprotect.utility.Chat;
 import net.coreprotect.utility.Extensions;
+import net.coreprotect.utility.EntitySpawnTracking;
 import net.coreprotect.utility.Teleport;
+import net.coreprotect.utility.ErrorReporter;
 
 /**
  * Service responsible for handling plugin shutdown operations
@@ -53,6 +56,12 @@ public class ShutdownService {
                 revertTeleportBlocks();
             }
 
+            if (ConfigHandler.serverRunning) {
+                EntitySpawnTracking.queueLoadedLocationsForShutdown();
+            }
+
+            InventoryChangeListener.flushPendingTransactionsForShutdown();
+
             ConfigHandler.serverRunning = false;
             long shutdownTime = System.currentTimeMillis();
             long nextAlertTime = shutdownTime + ALERT_INTERVAL_MS;
@@ -74,7 +83,7 @@ public class ShutdownService {
             Chat.console(Phrase.build(Phrase.DISABLE_SUCCESS, "CoreProtect v" + plugin.getDescription().getVersion()));
         }
         catch (Exception e) {
-            e.printStackTrace();
+            ErrorReporter.report(e);
         }
     }
 

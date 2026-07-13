@@ -21,6 +21,7 @@ import net.coreprotect.thread.CacheHandler;
 import net.coreprotect.utility.BlockTypeUtils;
 import net.coreprotect.utility.MaterialUtils;
 import net.coreprotect.utility.WorldUtils;
+import net.coreprotect.utility.ErrorReporter;
 
 public class BlockPlaceLogger {
 
@@ -51,6 +52,13 @@ public class BlockPlaceLogger {
             else if (forceType != null && (type == null || !type.equals(forceType))) {
                 type = forceType;
                 data = forceData;
+            }
+            if (forceType != null && type != null && blockKey.length() > 0) {
+                Material blockDataType = MaterialUtils.getType(blockKey);
+                if (blockDataType != null && !blockDataType.equals(type)) {
+                    blockKey = type.getKey().toString();
+                    blockData = null;
+                }
             }
             if (blockKey.length() == 0) {
                 if (type == null) {
@@ -126,7 +134,7 @@ public class BlockPlaceLogger {
             BlockStatement.insert(preparedStmt, batchCount, time, userId, wid, x, y, z, internalType, data, meta, blockData, LookupActions.BLOCK_PLACE, 0);
         }
         catch (Exception e) {
-            e.printStackTrace();
+            ErrorReporter.report(e);
         }
     }
 

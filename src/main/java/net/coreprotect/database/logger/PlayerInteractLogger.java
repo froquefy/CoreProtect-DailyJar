@@ -16,6 +16,7 @@ import net.coreprotect.model.action.LookupActions;
 import net.coreprotect.utility.BlockTypeUtils;
 import net.coreprotect.utility.MaterialUtils;
 import net.coreprotect.utility.WorldUtils;
+import net.coreprotect.utility.ErrorReporter;
 
 public class PlayerInteractLogger {
 
@@ -27,6 +28,13 @@ public class PlayerInteractLogger {
         try {
             String blockData = block.getBlockData().getAsString();
             String blockKey = BlockTypeUtils.getBlockDataKey(blockData);
+            if (blockType != null && blockKey.length() > 0) {
+                Material blockDataType = MaterialUtils.getType(blockKey);
+                if (BlockTypeUtils.isAir(blockKey) || (blockDataType != null && !blockDataType.equals(blockType))) {
+                    blockKey = blockType.getKey().toString();
+                    blockData = null;
+                }
+            }
             if (blockKey.length() == 0 && blockType != null) {
                 blockKey = blockType.getKey().toString();
             }
@@ -59,7 +67,7 @@ public class PlayerInteractLogger {
             BlockStatement.insert(preparedStmt, batchCount, time, userId, wid, x, y, z, type, data, null, blockData, LookupActions.INTERACTION, 0);
         }
         catch (Exception e) {
-            e.printStackTrace();
+            ErrorReporter.report(e);
         }
     }
 

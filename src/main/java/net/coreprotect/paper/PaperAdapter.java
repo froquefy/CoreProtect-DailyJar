@@ -5,7 +5,9 @@ import java.util.UUID;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.Server;
+import org.bukkit.World;
 import org.bukkit.block.Sign;
 import org.bukkit.block.Skull;
 import org.bukkit.entity.Entity;
@@ -13,6 +15,7 @@ import org.bukkit.entity.Villager;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.MerchantRecipe;
+import org.bukkit.plugin.Plugin;
 
 import net.coreprotect.bukkit.BukkitAdapter;
 import net.coreprotect.config.ConfigHandler;
@@ -30,6 +33,7 @@ public class PaperAdapter implements PaperInterface {
     public static final int PAPER_V1_19 = BukkitAdapter.BUKKIT_V1_19;
     public static final int PAPER_V1_20 = BukkitAdapter.BUKKIT_V1_20;
     public static final int PAPER_V1_21 = BukkitAdapter.BUKKIT_V1_21;
+    public static final int PAPER_V26_0 = BukkitAdapter.BUKKIT_V26_0;
 
     public static void loadAdapter() {
         int paperVersion = ConfigHandler.SERVER_VERSION;
@@ -49,13 +53,20 @@ public class PaperAdapter implements PaperInterface {
                 break;
             case PAPER_V1_17:
             case PAPER_V1_18:
-            case PAPER_V1_19:
                 PaperAdapter.ADAPTER = new Paper_v1_17();
                 break;
+            case PAPER_V1_19:
+                PaperAdapter.ADAPTER = new Paper_v1_19();
+                break;
             case PAPER_V1_20:
-            case PAPER_V1_21:
-            default:
                 PaperAdapter.ADAPTER = new Paper_v1_20();
+                break;
+            case PAPER_V1_21:
+                PaperAdapter.ADAPTER = new Paper_v1_20();
+                break;
+            case PAPER_V26_0:
+            default:
+                PaperAdapter.ADAPTER = new Paper_26_0();
                 break;
         }
     }
@@ -71,6 +82,11 @@ public class PaperAdapter implements PaperInterface {
     }
 
     @Override
+    public double getAverageTickTime(Server server) {
+        return -1.0D;
+    }
+
+    @Override
     public String getLine(Sign sign, int line) {
         return BukkitAdapter.ADAPTER.getLine(sign, line);
     }
@@ -81,8 +97,38 @@ public class PaperAdapter implements PaperInterface {
     }
 
     @Override
+    public void prefetchChunk(World world, int chunkX, int chunkZ) {
+        // chunk prefetching requires the Paper async chunk API
+    }
+
+    @Override
+    public boolean isOwnedByCurrentRegion(Entity entity) {
+        return true;
+    }
+
+    @Override
+    public boolean isOwnedByCurrentRegion(World world, int chunkX, int chunkZ) {
+        return true;
+    }
+
+    @Override
+    public boolean executeEntityTask(Plugin plugin, Entity entity, Runnable task, Runnable retiredTask) {
+        return false;
+    }
+
+    @Override
+    public boolean executeEntityTask(Plugin plugin, Entity entity, Runnable task, Runnable retiredTask, long delayTicks) {
+        return false;
+    }
+
+    @Override
     public String getSkullOwner(Skull skull) {
-        return skull.getOwningPlayer().getUniqueId().toString();
+        OfflinePlayer player = skull.getOwningPlayer();
+        if (player == null || player.getUniqueId() == null) {
+            return null;
+        }
+
+        return player.getUniqueId().toString();
     }
 
     @Override
