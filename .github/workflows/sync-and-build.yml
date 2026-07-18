@@ -59,6 +59,19 @@ jobs:
           echo "versioned=$JAR" >> "$GITHUB_OUTPUT"
           echo "name=$(basename "$JAR")" >> "$GITHUB_OUTPUT"
 
+      - name: DEBUG RELEASE_TOKEN (temporary)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          set +e
+          echo "== token identity =="
+          gh api user --jq '.login' || echo "  (no /user access for this token)"
+          echo "== simple name PATCH =="
+          gh api -X PATCH repos/froquefy/CoreProtect-DailyJar/releases/322648750 -f name='CoreProtect-24.0.jar' --jq '.id' && echo "  simple PATCH OK" || echo "  simple PATCH FAILED"
+          echo "== make_latest PATCH =="
+          gh api -X PATCH repos/froquefy/CoreProtect-DailyJar/releases/322648750 -F make_latest=true --jq '.id' && echo "  make_latest PATCH OK" || echo "  make_latest PATCH FAILED"
+
       - name: Publish rolling release
         uses: softprops/action-gh-release@v2
         with:
