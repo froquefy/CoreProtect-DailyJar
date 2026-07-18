@@ -76,9 +76,10 @@ jobs:
           - Version-independent: https://github.com/${{ github.repository }}/releases/latest/download/CoreProtect-latest.jar
           - Versioned: https://github.com/${{ github.repository }}/releases/latest/download/${{ steps.jar.outputs.name }}
           EOF
-          if gh release view latest-build >/dev/null 2>&1; then
-            gh release edit latest-build --title "${{ steps.jar.outputs.name }}" --notes-file "$notes" --latest
+          repo="${{ github.repository }}"
+          if gh release view latest-build --repo "$repo" >/dev/null 2>&1; then
+            gh release edit latest-build --repo "$repo" --title "${{ steps.jar.outputs.name }}" --notes-file "$notes" --latest
           else
-            gh release create latest-build --title "${{ steps.jar.outputs.name }}" --notes-file "$notes" --latest
+            gh release create latest-build --repo "$repo" --title "${{ steps.jar.outputs.name }}" --notes-file "$notes" --latest
           fi
-          gh release upload latest-build target/CoreProtect-latest.jar "${{ steps.jar.outputs.versioned }}" --clobber
+          gh release upload latest-build --repo "$repo" target/CoreProtect-latest.jar "${{ steps.jar.outputs.versioned }}" --clobber
