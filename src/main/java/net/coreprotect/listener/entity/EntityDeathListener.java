@@ -74,6 +74,7 @@ import net.coreprotect.CoreProtect;
 import net.coreprotect.bukkit.BukkitAdapter;
 import net.coreprotect.config.Config;
 import net.coreprotect.consumer.Queue;
+import net.coreprotect.listener.player.EntityInteractionListener;
 import net.coreprotect.paper.PaperAdapter;
 import net.coreprotect.spigot.SpigotAdapter;
 import net.coreprotect.thread.CacheHandler;
@@ -645,9 +646,10 @@ public final class EntityDeathListener extends Queue implements Listener {
             return;
         }
 
-        if (EntitySpawnTracking.isTracked(entity)) {
-            Queue.queueEntitySpawnRemoved(entity.getUniqueId(), entity.getLocation());
-            EntitySpawnTracking.forget(entity.getUniqueId());
+        if (EntitySpawnTracking.isTrackedOrPendingIdentity(entity)) {
+            EntityInteractionListener.flushPendingInteractions(entity);
+            Queue.queueEntitySpawnRemoved(entity);
+            EntitySpawnTracking.clearTracking(entity.getUniqueId());
         }
 
         logEntityDeath(entity, null);
